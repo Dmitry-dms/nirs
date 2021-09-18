@@ -25,21 +25,20 @@ func NewCore(r repository.KVRepository) *Core {
 }
 
 func (c *Core) ReadXMLFromDir(path string, cat *XMLCatalog) error {
-	xmlFile, err := os.Open("ter.xml")
+	xmlFile, err := os.Open(path)
 	if err != nil {
 		return err
 	}
 	defer xmlFile.Close()
 	byteValue, err := ioutil.ReadAll(xmlFile)
-	var catalog XMLCatalog
-	xml.Unmarshal(byteValue, &catalog)
+	xml.Unmarshal(byteValue, &cat)
 	return err
 }
 
 func (c *Core) AggregateStructs(cat *XMLCatalog, t []*Terrorist, wg *sync.WaitGroup) {
 	for _, ter := range cat.Terrorists {
 		wg.Add(1)
-		go func(ter *Terr, wg *sync.WaitGroup) {
+		//go func(ter *Terr, wg *sync.WaitGroup) {
 			if strings.Contains(ter.Name, "*") {
 				ter.IsExtremist = true
 			}
@@ -50,9 +49,9 @@ func (c *Core) AggregateStructs(cat *XMLCatalog, t []*Terrorist, wg *sync.WaitGr
 			ter.BirthPlace = TrimSuffixAndPrefix(ter.BirthPlace)
 			ter.Passport = TrimSuffixAndPrefix(ter.Passport)
 			t = append(t, ter.ConvertTerr())
-			fmt.Println(ter)
+			fmt.Println(ter.Name)
 			wg.Done()
-		}(ter, wg)
+		//}(ter, wg)
 	}
 }
 func (c *Core) generateHash(s string) (int, error) {

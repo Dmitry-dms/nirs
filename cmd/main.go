@@ -24,12 +24,12 @@ func main() {
 	core.AggregateStructs(&catalogRaw, t, wg)	
 	wg.Wait()
 
-	catalog := catalogRaw.ConvertCatalog(t)
+	//catalog := catalogRaw.ConvertCatalog(t)
 	// for i := 0; i < 20; i++ {
 	// 	fmt.Println(i)
 	// 	fmt.Println(newCatalog.Terrorists[i].Names)
 	// 	fmt.Println("-------------")
 	// }
 	// core.StoreAllKeys(&newCatalog)
-	fmt.Println(catalog.Terrorists[0].Names)
+	fmt.Println(catalogRaw.Terrorists[0].Name)
 }

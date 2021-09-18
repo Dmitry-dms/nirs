@@ -27,9 +27,18 @@ type Terr struct {
 	BirthPlace  string `xml:"BIRTH_PLACE"`
 	Passport    string `xml:"PASSPORT"`
 }
+type PassType int
+
+const (
+	Russia PassType = iota
+	Ussr
+	Other
+)
+
 type Passport struct {
 	RawData      []string
 	SerialAndNum []string
+	Type         PassType
 }
 type Terrorist struct {
 	Names       []string
@@ -97,10 +106,11 @@ func splitAddress(s string) []string {
 	return a
 }
 func splitPassport(s string) Passport {
-	if s == "" {
+	if len(s) <= 35 {
 		return Passport{
 			RawData:      nil,
 			SerialAndNum: nil,
+			Type: 10,
 		}
 	} else {
 		var r []string
