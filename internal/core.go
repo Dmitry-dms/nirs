@@ -2,7 +2,7 @@ package internal
 
 import (
 	"encoding/xml"
-	"fmt"
+
 	"hash"
 	"hash/fnv"
 	"io/ioutil"
@@ -48,8 +48,9 @@ func (c *Core) AggregateStructs(cat *XMLCatalog, t []*Terrorist, wg *sync.WaitGr
 			ter.Resolution = TrimSuffixAndPrefix(ter.Resolution)
 			ter.BirthPlace = TrimSuffixAndPrefix(ter.BirthPlace)
 			ter.Passport = TrimSuffixAndPrefix(ter.Passport)
+			//fmt.Println(ter.Passport)
 			t = append(t, ter.ConvertTerr())
-			fmt.Println(ter.Name)
+			
 			wg.Done()
 		//}(ter, wg)
 	}

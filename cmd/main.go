@@ -1,7 +1,7 @@
 package main
 
 import (
-	"fmt"
+	//"fmt"
 	"log"
 	"sync"
 
@@ -31,5 +31,5 @@ func main() {
 	// 	fmt.Println("-------------")
 	// }
 	// core.StoreAllKeys(&newCatalog)
-	fmt.Println(catalogRaw.Terrorists[0].Name)
+	//fmt.Println(catalogRaw.Terrorists[0].Name)
 }
