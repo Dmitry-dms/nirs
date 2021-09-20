@@ -1,7 +1,10 @@
 package main
 
 import (
+	"encoding/binary"
 	"fmt"
+	"hash/fnv"
+	"log"
 	"regexp"
 	"strings"
 )
@@ -11,11 +14,23 @@ type n struct {
 }
 
 func main() {
-	test := "AL-QAIDA IN THE ARABIAN PENINSULA"
+	test := "hello"
 
-	final := split(test)
+	final := generateHash(test)
 	fmt.Println(final)
-	fmt.Println(len(final))
+
+}
+func generateHash(s string) []byte {
+	g := fnv.New32()
+	g.Write([]byte(s))
+	bs := make([]byte, 4)
+	binary.LittleEndian.PutUint32(bs, g.Sum32())
+    return bs
+}
+func show(s []string) {
+	for i, j := range s {
+		fmt.Printf("[%d] %s \n", i, j)
+	}
 }
 func splitAddress(s string) []string {
 	var a []string
@@ -44,7 +59,7 @@ func split(s string) []string {
 	pattern := "\\(+.*"
 	r := regexp.MustCompile(pattern)
 	secPart := r.FindAllString(s, 5) // Делим строку на две части с помощью regex, отделяем первую часть и вторую
-	if secPart == nil { // Если деление не сработало, значит имеем всего одно имя
+	if secPart == nil {              // Если деление не сработало, значит имеем всего одно имя
 		result = append(result, s)
 		return result
 	}
@@ -76,15 +91,15 @@ func split(s string) []string {
 	return removeDuplicateStr(result) // Избавляемся от дубликатов имени
 }
 func removeDuplicateStr(strSlice []string) []string {
-    allKeys := make(map[string]bool)
-    list := []string{}
-    for _, item := range strSlice {
-        if _, value := allKeys[item]; !value {
-            allKeys[item] = true
-            list = append(list, item)
-        }
-    }
-    return list
+	allKeys := make(map[string]bool)
+	list := []string{}
+	for _, item := range strSlice {
+		if _, value := allKeys[item]; !value {
+			allKeys[item] = true
+			list = append(list, item)
+		}
+	}
+	return list
 }
 func removeSpaces(s string) string {
 	return strings.TrimSpace(s)
@@ -102,22 +117,31 @@ func SplitPassport(s string) Passport {
 			SerialAndNum: nil,
 		}
 	} else {
-		var r []string
+		var singlePass []string
 		var serial []string
 		raw := strings.Split(s[:len(s)-1], ",")
-		r = append(r, raw...)
-		for _, p := range r {
-			r := []rune(p)
-			if r[8] == 'Р' {
-				serial = append(serial, string(r[12:23]))
-			} else if r[8] == 'С' {
-				serial = append(serial, string(r[14:27]))
+		singlePass = append(singlePass, raw...)
+		for _, p := range singlePass {
+			if len(p) < 9 { // Если разделение строк пошло не по шаблону, прекращаем разделение
+				log.Printf("Skip password split. Unusual data: %s", raw)
+				return Passport{
+					RawData:      raw,
+					SerialAndNum: nil,
+				}
+			}
+			runeString := []rune(p)
+			if runeString[8] == 'Р' {
+				serial = append(serial, string(runeString[12:23]))
+			} else if runeString[8] == 'С' {
+				serial = append(serial, string(runeString[14:27]))
+			} else if runeString[10] == 'A' {
+				serial = append(serial, string(runeString[10:22]))
 			} else {
-				serial = append(serial, strings.TrimSpace(string(r[10:20])))
+				serial = append(serial, strings.TrimSpace(string(runeString[10:20])))
 			}
 		}
 		return Passport{
-			RawData:      r,
+			RawData:      singlePass,
 			SerialAndNum: serial,
 		}
 	}

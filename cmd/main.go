@@ -3,6 +3,7 @@ package main
 import (
 	//"fmt"
 	"log"
+	"os"
 	"sync"
 
 	internal "github.com/Dmitry-dms/nirs/internal"
@@ -12,9 +13,9 @@ import (
 func main() {
 	var catalogRaw internal.XMLCatalog
 	var t []*internal.Terrorist
-
+	logger := log.New(os.Stdout, "SYSTEM: ", 1)
 	KVRepo := repository.NewBoltDB("test.db")
-	core := internal.NewCore(KVRepo)
+	core := internal.NewCore(KVRepo, logger)
 	err := core.ReadXMLFromDir("ter.xml", &catalogRaw)
 	if err != nil {
 		log.Println(err)

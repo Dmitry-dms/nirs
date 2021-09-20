@@ -1,7 +1,8 @@
 package internal
 
 import (
-	"fmt"
+
+	"log"
 	"regexp"
 	"strings"
 )
@@ -62,10 +63,10 @@ func trimSpace(s []string) []string {
 	}
 	return n
 }
-func (t *Terr) ConvertTerr() *Terrorist {
+func (t *Terr) ConvertTerr(l *log.Logger) *Terrorist {
 	names := splitNames(t.Name)
 	adr := splitAddress(t.Address)
-	pass := splitPassport(t.Passport)
+	pass := splitPassport(t.Passport, l)
 	return &Terrorist{
 		Names:       names,
 		IsExtremist: t.IsExtremist,
@@ -149,33 +150,38 @@ func splitAddress(s string) []string {
 	a = append(a, addresses...)
 	return a
 }
-func splitPassport(s string) Passport {
+func splitPassport(s string, l *log.Logger) Passport {
 	if len(s) <= 10 {
 		return Passport{
 			RawData:      nil,
 			SerialAndNum: nil,
 		}
 	} else {
-		var r []string
+		var singlePass []string
 		var serial []string
 		raw := strings.Split(s[:len(s)-1], ",")
-		r = append(r, raw...)
-		for _, p := range r { 
-			if len(p) < 9 {
-				fmt.Println(raw)
-				continue
+		singlePass = append(singlePass, raw...)
+		for _, p := range singlePass {
+			if len(p) < 9 { // Если разделение строк пошло не по шаблону, прекращаем разделение
+				log.Printf("Skip password split. Unusual data: %s", raw)
+				return Passport{
+					RawData: raw,
+					SerialAndNum: nil,
+				}
 			}
-			r := []rune(p)
-			if r[8] == 'Р' {
-				serial = append(serial, string(r[12:23]))
-			} else if r[8] == 'С' {
-				serial = append(serial, string(r[14:27]))
+			runeString := []rune(p)
+			if runeString[8] == 'Р' {
+				serial = append(serial, string(runeString[12:23]))
+			} else if runeString[8] == 'С' {
+				serial = append(serial, string(runeString[14:27]))
+			} else if runeString[10] == 'A' {
+				serial = append(serial, string(runeString[10:22]))
 			} else {
-				serial = append(serial, strings.TrimSpace(string(r[10:20])))
+				serial = append(serial, strings.TrimSpace(string(runeString[10:20])))
 			}
 		}
 		return Passport{
-			RawData:      r,
+			RawData:      singlePass,
 			SerialAndNum: serial,
 		}
 	}
