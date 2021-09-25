@@ -4,9 +4,12 @@ import (
 	"encoding/binary"
 	"fmt"
 	"hash/fnv"
+
 	"log"
 	"regexp"
 	"strings"
+
+	"github.com/Dmitry-dms/nirs/internal/repository"
 )
 
 type n struct {
@@ -14,11 +17,9 @@ type n struct {
 }
 
 func main() {
-	test := "hello"
-
-	final := generateHash(test)
-	fmt.Println(final)
-
+	KVRepo := repository.NewBoltDB("test.db")
+	//KVRepo.AddValue([]byte("sad"), "cat")
+	fmt.Println(KVRepo.GetValue([]byte("АБДУРАХМАНОВ АБДУРАХМАН МАГОМЕДОВИЧ")))
 }
 func generateHash(s string) []byte {
 	g := fnv.New32()

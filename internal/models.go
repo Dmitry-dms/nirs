@@ -63,15 +63,24 @@ func trimSpace(s []string) []string {
 	}
 	return n
 }
+func convertInn(s string) string {
+	inn := removeSpaces(s)
+	if len(inn) == 0 {
+		return "NULL"
+	} else {
+		return inn
+	}
+}
 func (t *Terr) ConvertTerr(l *log.Logger) *Terrorist {
 	names := splitNames(t.Name)
 	adr := splitAddress(t.Address)
 	pass := splitPassport(t.Passport, l)
+	inn := convertInn(t.INN)
 	return &Terrorist{
 		Names:       names,
 		IsExtremist: t.IsExtremist,
 		PersonType:  t.PersonType,
-		INN:         t.INN,
+		INN:         inn,
 		BirthDate:   t.BirthDate,
 		Address:     adr,
 		Resolution:  t.Resolution,

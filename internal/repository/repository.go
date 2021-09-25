@@ -1,6 +1,6 @@
 package repository
 
 type KVRepository interface {
-	AddValue(key, value string) error
-	GetValue(key string) (string, error)
+	AddValue(key, value []byte) error
+	GetValue(key []byte) (string, error)
 }

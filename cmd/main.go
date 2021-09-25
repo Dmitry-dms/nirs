@@ -2,15 +2,17 @@ package main
 
 import (
 	//"fmt"
+	"fmt"
 	"log"
 	"os"
-	"sync"
+	"time"
 
 	internal "github.com/Dmitry-dms/nirs/internal"
 	"github.com/Dmitry-dms/nirs/internal/repository"
 )
 
 func main() {
+	now := time.Now()
 	var catalogRaw internal.XMLCatalog
 	var t []*internal.Terrorist
 	logger := log.New(os.Stdout, "SYSTEM: ", 1)
@@ -20,17 +22,19 @@ func main() {
 	if err != nil {
 		log.Println(err)
 	}
-	
-	wg := &sync.WaitGroup{}
-	core.AggregateStructs(&catalogRaw, t, wg)	
-	wg.Wait()
 
-	//catalog := catalogRaw.ConvertCatalog(t)
-	// for i := 0; i < 20; i++ {
+	t = core.AggregateStructs(&catalogRaw, t)
+
+	catalog := catalogRaw.ConvertCatalog(t)
+
+	// for i := 0; i < 2; i++ {
 	// 	fmt.Println(i)
-	// 	fmt.Println(newCatalog.Terrorists[i].Names)
+	// 	fmt.Println(catalog.Terrorists[i].Names)
 	// 	fmt.Println("-------------")
 	// }
-	// core.StoreAllKeys(&newCatalog)
-	//fmt.Println(catalogRaw.Terrorists[0].Name)
+	core.StoreAllKeys(&catalog)
+	fmt.Printf("Длина изначально - %d \n", len(catalogRaw.Terrorists))
+	fmt.Printf("Длина после конвертации - %d \n", len(t))
+	fmt.Printf("Время выполнения - %s \n", time.Since(now))
 }
+

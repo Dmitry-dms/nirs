@@ -25,21 +25,21 @@ func NewBoltDB(fileName string) *BoltDB {
 		Passport:  "passport"}
 }
 
-func (b *BoltDB) AddValue(key, value string) error {
+func (b *BoltDB) AddValue(key, value []byte) error {
 	b.Database.Update(func(tx *bolt.Tx) error {
 		b, err := tx.CreateBucketIfNotExists([]byte(b.Names))
 		if err != nil {
 			return err
 		}
-		return b.Put([]byte(key), []byte(value))
+		return b.Put(key, value)
 	})
 	return nil
 }
-func (b *BoltDB) GetValue(key string) (string, error) {
+func (b *BoltDB) GetValue(key []byte) (string, error) {
 	var v []byte
 	err := b.Database.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(b.Names))
-		v = b.Get([]byte(key))
+		v = b.Get(key)
 		return nil
 	})
 	return string(v), err
