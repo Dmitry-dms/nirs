@@ -1,7 +1,6 @@
 package internal
 
 import (
-	"encoding/binary"
 	"encoding/xml"
 	"fmt"
 	"log"
@@ -15,25 +14,31 @@ import (
 	"sync"
 
 	"github.com/Dmitry-dms/nirs/internal/repository"
+//	"github.com/Dmitry-dms/nirs/pkg/pool"
 )
 
 type Core struct {
 	KVRepo repository.KVRepository
+	Sqlite repository.SQLRepository
 	hash   hash.Hash32
 	logger *log.Logger
 	mu     *sync.Mutex
 }
 
-func NewCore(r repository.KVRepository, logger *log.Logger) *Core {
+func NewCore(r repository.KVRepository, sql repository.SQLRepository, logger *log.Logger) *Core {
 	g := fnv.New32()
 	return &Core{
 		KVRepo: r,
 		logger: logger,
 		hash:   g,
 		mu:     &sync.Mutex{},
+		Sqlite: sql,
 	}
 }
-
+func (c *Core) Shutdown() {
+	c.KVRepo.Close()
+	c.Sqlite.Close()
+}
 func (c *Core) ReadXMLFromDir(path string, cat *XMLCatalog) error {
 	xmlFile, err := os.Open(path)
 	if err != nil {
@@ -71,22 +76,91 @@ func (c *Core) AggregateStructs(cat *XMLCatalog, t []*Terrorist) []*Terrorist {
 	fmt.Println(time.Since(now))
 	return t
 }
-func (c *Core) GenerateHash(s string) []byte {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.hash.Write([]byte(s))
-	bs := make([]byte, 4)
-	binary.LittleEndian.PutUint32(bs, c.hash.Sum32())
-	return bs
+
+type Result struct {
+	repository.SqlitePerson
+	Res []bool
+}
+
+func (c *Core) Search(out chan Result, quit chan int) []*Result{
+	rows := c.Sqlite.GetAllValues()
+	mu := &sync.Mutex{}
+	var s []*Result
+	//pool := pool.NewPool(1000, 100, 1000)
+	wg := &sync.WaitGroup{}
+	for _, row := range rows {
+		wg.Add(1)
+		//pool.Schedule(
+			func() {
+				r := c.process(wg, row, out)
+				if r == nil {
+					return
+				} else {
+				mu.Lock()
+				s=append(s, r)
+				mu.Unlock()
+				}
+			}()
+	//	)
+
+	}
+	wg.Wait()
+	return s
+	//quit <- 0
+}
+func (c *Core) process(w *sync.WaitGroup, r *repository.SqlitePerson, out chan Result) *Result {
+	var h []bool
+	one, _ := c.KVRepo.GetValue([]byte(r.Name))
+	if one == "true" {
+		h = append(h, true)
+	} else {
+		h = append(h, false)
+	}
+	two, _ := c.KVRepo.GetValue([]byte(r.Passport))
+	if two == "true" {
+		h = append(h, true)
+	} else {
+		h = append(h, false)
+	}
+	three, _ := c.KVRepo.GetValue([]byte(r.Inn))
+	if three == "true" {
+		h = append(h, true)
+	} else {
+		h = append(h, false)
+	}
+	four, _ := c.KVRepo.GetValue([]byte(r.Address))
+	if four == "true" {
+		h = append(h, true)
+	} else {
+		h = append(h, false)
+	}
+	//res := [4]string{one, two, three, four}
+	if isTrue(h) {
+		s := Result{
+			Res:          h,
+			SqlitePerson: *r,
+		}
+		//out <- s
+		w.Done()
+		return &s
+	} else {
+		w.Done()
+		return nil
+	}
+}
+func isTrue(s []bool) bool {
+	for _, h := range s {
+		if h == true {
+			return true
+		}
+	}
+	return false
 }
 func (c *Core) GetValue(key []byte) (string, error) {
 	return c.KVRepo.GetValue(key)
 }
 func (c *Core) StoreAllKeys(catalog *Catalog) {
 	wg := &sync.WaitGroup{}
-
-
-	
 	for _, ter := range catalog.Terrorists {
 		wg.Add(1)
 		go func(ter *Terrorist, wg *sync.WaitGroup) {
@@ -99,6 +173,7 @@ func (c *Core) StoreAllKeys(catalog *Catalog) {
 			for _, p := range ter.Passport.SerialAndNum {
 				c.KVRepo.AddValue([]byte(p), []byte("true"))
 			}
+			c.KVRepo.AddValue([]byte(ter.INN), []byte("true"))
 			wg.Done()
 		}(ter, wg)
 	}

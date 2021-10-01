@@ -24,9 +24,11 @@ func NewBoltDB(fileName string) *BoltDB {
 		Addresses: "address",
 		Passport:  "passport"}
 }
-
+func (b *BoltDB) Close() error {
+	return b.Database.Close()
+}
 func (b *BoltDB) AddValue(key, value []byte) error {
-	b.Database.Update(func(tx *bolt.Tx) error {
+	b.Database.Batch(func(tx *bolt.Tx) error {
 		b, err := tx.CreateBucketIfNotExists([]byte(b.Names))
 		if err != nil {
 			return err

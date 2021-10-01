@@ -47,6 +47,7 @@ type Terrorist struct {
 	Passport    Passport
 }
 
+
 func (c XMLCatalog) ConvertCatalog(terr []*Terrorist) Catalog {
 	return Catalog{
 		Num:        c.Num,
@@ -156,7 +157,14 @@ func removeSpaces(s string) string {
 func splitAddress(s string) []string {
 	var a []string
 	addresses := strings.Split(s, ";")
-	a = append(a, addresses...)
+	for _,j := range addresses {
+		//fmt.Println(j)
+		gg := strings.TrimSuffix(j, ",")
+		// if j[len(j)-1] == byte(','){
+		// 	j = j[:len(j)-1]
+		// }
+		a=append(a, gg)
+	}
 	return a
 }
 func splitPassport(s string, l *log.Logger) Passport {

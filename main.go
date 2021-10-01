@@ -12,21 +12,28 @@ import (
 	"github.com/Dmitry-dms/nirs/internal/repository"
 )
 
-type n struct {
-	T []string
+func main() {
+
+	one := GetAllSqlValues()
+
+	fmt.Println(len(one))
+
 }
 
-func main() {
-	KVRepo := repository.NewBoltDB("test.db")
-	//KVRepo.AddValue([]byte("sad"), "cat")
-	fmt.Println(KVRepo.GetValue([]byte("АБДУРАХМАНОВ АБДУРАХМАН МАГОМЕДОВИЧ")))
+func GetAllSqlValues() []*repository.SqlitePerson {
+	db := repository.NewSqlite("people.db")
+	defer db.Close()
+	return db.GetAllValues()
+}
+func GetValue(rep *repository.BoltDB, key []byte) (string, error) {
+	return rep.GetValue(key)
 }
 func generateHash(s string) []byte {
 	g := fnv.New32()
 	g.Write([]byte(s))
 	bs := make([]byte, 4)
 	binary.LittleEndian.PutUint32(bs, g.Sum32())
-    return bs
+	return bs
 }
 func show(s []string) {
 	for i, j := range s {
@@ -36,7 +43,12 @@ func show(s []string) {
 func splitAddress(s string) []string {
 	var a []string
 	addresses := strings.Split(s, ";")
-	a = append(a, addresses...)
+	for _,j := range addresses {
+		if j[len(j)-1] == byte(','){
+			j = j[:len(j)-1]
+		}
+		a=append(a, j)
+	}
 	return a
 }
 func splitNames(s string) []string {
