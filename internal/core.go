@@ -14,18 +14,19 @@ import (
 	"sync"
 
 	"github.com/Dmitry-dms/nirs/internal/repository"
-//	"github.com/Dmitry-dms/nirs/pkg/pool"
+	"github.com/Dmitry-dms/nirs/pkg/pool"
 )
 
 type Core struct {
 	KVRepo repository.KVRepository
-	Sqlite repository.SQLRepository
+	//Sqlite repository.SQLRepository
+	Sqlite *repository.SqliteRepository
 	hash   hash.Hash32
 	logger *log.Logger
 	mu     *sync.Mutex
 }
 
-func NewCore(r repository.KVRepository, sql repository.SQLRepository, logger *log.Logger) *Core {
+func NewCore(r repository.KVRepository, sql *repository.SqliteRepository, logger *log.Logger) *Core {
 	g := fnv.New32()
 	return &Core{
 		KVRepo: r,
@@ -82,33 +83,40 @@ type Result struct {
 	Res []bool
 }
 
-func (c *Core) Search(out chan Result, quit chan int) []*Result{
-	rows := c.Sqlite.GetAllValues()
-	mu := &sync.Mutex{}
-	var s []*Result
-	//pool := pool.NewPool(1000, 100, 1000)
+func (c *Core) Search() []*Result {
+	rows, err := c.Sqlite.Db.Query("select * from MOCKDATA")
+	if err != nil {
+		panic(err)
+	}
+	defer rows.Close()
+	pool := pool.NewPool(10, 3, 10)
 	wg := &sync.WaitGroup{}
-	for _, row := range rows {
+	var res []*Result
+	mu := sync.Mutex{}
+	for rows.Next() {
 		wg.Add(1)
-		//pool.Schedule(
-			func() {
-				r := c.process(wg, row, out)
-				if r == nil {
-					return
-				} else {
+		p := repository.SqlitePerson{}
+		err := rows.Scan(&p.Id, &p.Name, &p.Passport, &p.Inn, &p.Address)
+		if err != nil {
+			log.Println(err)
+		}
+		pool.Schedule(func() {
+			r := c.process(&p)
+			if r == nil {
+				wg.Done()
+				return
+			} else {
 				mu.Lock()
-				s=append(s, r)
+				res = append(res, r)
 				mu.Unlock()
-				}
-			}()
-	//	)
-
+				wg.Done()
+			}
+		})
 	}
 	wg.Wait()
-	return s
-	//quit <- 0
+	return res
 }
-func (c *Core) process(w *sync.WaitGroup, r *repository.SqlitePerson, out chan Result) *Result {
+func (c *Core) process(r *repository.SqlitePerson) *Result {
 	var h []bool
 	one, _ := c.KVRepo.GetValue([]byte(r.Name))
 	if one == "true" {
@@ -141,10 +149,10 @@ func (c *Core) process(w *sync.WaitGroup, r *repository.SqlitePerson, out chan R
 			SqlitePerson: *r,
 		}
 		//out <- s
-		w.Done()
+		//w.Done()
 		return &s
 	} else {
-		w.Done()
+		//w.Done()
 		return nil
 	}
 }

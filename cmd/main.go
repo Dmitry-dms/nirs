@@ -14,7 +14,7 @@ import (
 
 func main() {
 	now := time.Now()
-//	var catalogRaw internal.XMLCatalog
+	//	var catalogRaw internal.XMLCatalog
 	//var t []*internal.Terrorist
 	logger := log.New(os.Stdout, "SYSTEM: ", 1)
 	KVRepo := repository.NewBoltDB("test.db")
@@ -38,25 +38,25 @@ func main() {
 	// 	fmt.Println("-------------")
 	// }
 	//core.StoreAllKeys(&catalog)
-	cn := make(chan internal.Result)
-	quit := make(chan int)
+	// cn := make(chan internal.Result)
+	// quit := make(chan int)
 	//var res []internal.Result
-	s := core.Search(cn, quit)
+	s := core.Search()
 
-// ff:
-// 	for {
-// 		select {
-// 		case r := <-cn:
-// 			res = append(res, r)
-// 		case <-quit:
-// 			break ff
-// 		}
-// 	}
-fmt.Printf("Dlina - %d \n", len(s))
-	for _, j := range s {
-		fmt.Printf("[%s;%s;%s;%s]\n", j.Name, j.Passport, j.Inn, j.Address)
-		fmt.Printf("%v \n", j.Res)
-	}
+	// ff:
+	// 	for {
+	// 		select {
+	// 		case r := <-cn:
+	// 			res = append(res, r)
+	// 		case <-quit:
+	// 			break ff
+	// 		}
+	// 	}
+	//fmt.Printf("Dlina - %d \n", len(s))
+	// for _, j := range s {
+	// 	fmt.Printf("[%s;%s;%s;%s]\n", j.Name, j.Passport, j.Inn, j.Address)
+	// 	fmt.Printf("%v \n", j.Res)
+	// }
 	core.Shutdown()
 	fmt.Printf("Кол-во совпадений - %d \n", len(s))
 	//fmt.Printf("Длина изначально - %d \n", len(catalogRaw.Terrorists))
