@@ -32,26 +32,11 @@ func main() {
 	// signal.Notify(closeCh, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 	// <-closeCh
 
-	// for i := 0; i < 2; i++ {
-	// 	fmt.Println(i)
-	// 	fmt.Println(catalog.Terrorists[i].Names)
-	// 	fmt.Println("-------------")
-	// }
 	//core.StoreAllKeys(&catalog)
-	// cn := make(chan internal.Result)
-	// quit := make(chan int)
-	//var res []internal.Result
-	s := core.Search()
 
-	// ff:
-	// 	for {
-	// 		select {
-	// 		case r := <-cn:
-	// 			res = append(res, r)
-	// 		case <-quit:
-	// 			break ff
-	// 		}
-	// 	}
+	s := core.Search("MOCKDATA")
+
+	
 	//fmt.Printf("Dlina - %d \n", len(s))
 	// for _, j := range s {
 	// 	fmt.Printf("[%s;%s;%s;%s]\n", j.Name, j.Passport, j.Inn, j.Address)
@@ -59,7 +44,5 @@ func main() {
 	// }
 	core.Shutdown()
 	fmt.Printf("Кол-во совпадений - %d \n", len(s))
-	//fmt.Printf("Длина изначально - %d \n", len(catalogRaw.Terrorists))
-	//fmt.Printf("Длина после конвертации - %d \n", len(catalog.Terrorists))
 	fmt.Printf("Время выполнения - %s \n", time.Since(now))
 }

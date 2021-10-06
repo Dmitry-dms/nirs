@@ -83,8 +83,8 @@ type Result struct {
 	Res []bool
 }
 
-func (c *Core) Search() []*Result {
-	rows, err := c.Sqlite.Db.Query("select * from MOCKDATA")
+func (c *Core) Search(tableName string) []*Result {
+	rows, err := c.Sqlite.Db.Query(fmt.Sprintf("select * from %s", tableName))
 	if err != nil {
 		panic(err)
 	}
@@ -142,17 +142,13 @@ func (c *Core) process(r *repository.SqlitePerson) *Result {
 	} else {
 		h = append(h, false)
 	}
-	//res := [4]string{one, two, three, four}
+
 	if isTrue(h) {
-		s := Result{
+		return &Result{
 			Res:          h,
 			SqlitePerson: *r,
 		}
-		//out <- s
-		//w.Done()
-		return &s
 	} else {
-		//w.Done()
 		return nil
 	}
 }
@@ -185,6 +181,5 @@ func (c *Core) StoreAllKeys(catalog *Catalog) {
 			wg.Done()
 		}(ter, wg)
 	}
-
 	wg.Wait()
 }
