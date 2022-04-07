@@ -1,0 +1,31 @@
+[{
+    "date": "april 4",
+    "sqlName": "sql name",
+    "pName": "1012 xml",
+    "id": "generatedUUID",
+    "columns": ["name", "surname", "address", "passport", "nnn", "test1", "test2"],
+    "rows": [
+        [{
+            "field": "Иванов Иван Иванович",
+            "selected": false
+        }, {
+            "field": "bolton",
+            "selected": true
+        }, {
+            "field": "chikago",
+            "selected": true
+        }, {
+            "field": "653464656",
+            "selected": true
+        }, {
+            "field": "56547576585685",
+            "selected": true
+        }, {
+            "field": "test1",
+            "selected": false
+        }, {
+            "field": "test2",
+            "selected": false
+        }]
+    ]
+}]

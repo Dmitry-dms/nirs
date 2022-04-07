@@ -1,11 +1,54 @@
 package internal
 
 import (
-
 	"log"
 	"regexp"
 	"strings"
 )
+
+type History []HistoryElement
+
+type HistoryElement struct {
+	Date    string       `json:"date"`
+	SQLName string       `json:"sqlName"`
+	PName   string       `json:"pName"`
+	ID      string       `json:"id"`
+	Columns []string     `json:"columns"`
+	Rows    [][]Row[any] `json:"rows"`
+}
+
+type SearchRequest struct {
+	PPath   string   `json:"pPath"`
+	SQLPAth string   `json:"sqlPath"`
+	Table   string   `json:"table"`
+	Columns []string `json:"columns"`
+}
+
+type Row[T any] struct {
+	Field    T    `json:"field"`
+	Selected bool `json:"selected"`
+}
+
+type Options struct {
+	XMLOptions []XMLOption `json:"xmlOptions"`
+	SQLOptions []SQLOption `json:"sqlOptions"`
+}
+
+type SQLOption struct {
+	Name   string  `json:"name"`
+	Path   string  `json:"path"`
+	Tables []Table `json:"tables"`
+}
+
+type Table struct {
+	Name    string   `json:"name"`
+	Columns []string `json:"columns"`
+}
+
+type XMLOption struct {
+	Name string `json:"name"`
+	Path string `json:"path"`
+}
 
 type XMLCatalog struct {
 	Num        string  `xml:"NUM,attr"`
@@ -31,10 +74,6 @@ type Terr struct {
 	Passport    string `xml:"PASSPORT"`
 }
 
-type Passport struct {
-	RawData      []string
-	SerialAndNum []string
-}
 type Terrorist struct {
 	Names       []string
 	IsExtremist bool
@@ -46,7 +85,10 @@ type Terrorist struct {
 	BirthPlace  string
 	Passport    Passport
 }
-
+type Passport struct {
+	RawData      []string
+	SerialAndNum []string
+}
 
 func (c XMLCatalog) ConvertCatalog(terr []*Terrorist) Catalog {
 	return Catalog{
@@ -89,6 +131,7 @@ func (t *Terr) ConvertTerr(l *log.Logger) *Terrorist {
 		Passport:    pass,
 	}
 }
+
 // func splitNames(s string) []string {
 // 	var names []string
 // 	secondName := strings.Split(s, "(")
@@ -109,7 +152,7 @@ func splitNames(s string) []string {
 	pattern := "\\(+.*"
 	r := regexp.MustCompile(pattern)
 	secPart := r.FindAllString(s, 5) // Делим строку на две части с помощью regex, отделяем первую часть и вторую
-	if secPart == nil { // Если деление не сработало, значит имеем всего одно имя
+	if secPart == nil {              // Если деление не сработало, значит имеем всего одно имя
 		result = append(result, s)
 		return result
 	}
@@ -141,15 +184,15 @@ func splitNames(s string) []string {
 	return removeDuplicateStr(result) // Избавляемся от дубликатов имени
 }
 func removeDuplicateStr(strSlice []string) []string {
-    allKeys := make(map[string]bool)
-    list := []string{}
-    for _, item := range strSlice {
-        if _, value := allKeys[item]; !value {
-            allKeys[item] = true
-            list = append(list, item)
-        }
-    }
-    return list
+	allKeys := make(map[string]bool)
+	list := []string{}
+	for _, item := range strSlice {
+		if _, value := allKeys[item]; !value {
+			allKeys[item] = true
+			list = append(list, item)
+		}
+	}
+	return list
 }
 func removeSpaces(s string) string {
 	return strings.TrimSpace(s)
@@ -157,13 +200,13 @@ func removeSpaces(s string) string {
 func splitAddress(s string) []string {
 	var a []string
 	addresses := strings.Split(s, ";")
-	for _,j := range addresses {
+	for _, j := range addresses {
 		//fmt.Println(j)
 		gg := strings.TrimSuffix(j, ",")
 		// if j[len(j)-1] == byte(','){
 		// 	j = j[:len(j)-1]
 		// }
-		a=append(a, gg)
+		a = append(a, gg)
 	}
 	return a
 }
@@ -180,9 +223,10 @@ func splitPassport(s string, l *log.Logger) Passport {
 		singlePass = append(singlePass, raw...)
 		for _, p := range singlePass {
 			if len(p) < 9 { // Если разделение строк пошло не по шаблону, прекращаем разделение
-				log.Printf("Skip password split. Unusual data: %s", raw)
+				//l.Println(p)
+				l.Printf("Пропуск парсинга паспорта, неправильный формат: [%#v] [%#v]", raw[0], raw[1])
 				return Passport{
-					RawData: raw,
+					RawData:      raw,
 					SerialAndNum: nil,
 				}
 			}

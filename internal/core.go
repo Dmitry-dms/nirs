@@ -1,13 +1,14 @@
 package internal
 
 import (
+	"context"
+
 	"encoding/xml"
 	"fmt"
-	"log"
-	"time"
 
-	"hash"
-	"hash/fnv"
+	"log"
+	"net/http"
+
 	"io/ioutil"
 	"os"
 	"strings"
@@ -18,27 +19,72 @@ import (
 )
 
 type Core struct {
-	KVRepo repository.KVRepository
-	//Sqlite repository.SQLRepository
-	Sqlite *repository.SqliteRepository
-	hash   hash.Hash32
-	logger *log.Logger
-	mu     *sync.Mutex
+	http.Server
+	KVRepo   repository.KVRepository
+	Sqlite   *repository.SqliteRepository
+	Settings Options
+	History  History
+	logger   *log.Logger
+	mu       *sync.Mutex
 }
 
-func NewCore(r repository.KVRepository, sql *repository.SqliteRepository, logger *log.Logger) *Core {
-	g := fnv.New32()
-	return &Core{
-		KVRepo: r,
-		logger: logger,
-		hash:   g,
-		mu:     &sync.Mutex{},
-		Sqlite: sql,
-	}
+type Config struct {
+	Address string
+	KVRepo  repository.KVRepository
+	Sqlite  *repository.SqliteRepository
+	Logger  *log.Logger
 }
-func (c *Core) Shutdown() {
+
+var aggregatedCatalogs = make(map[string]*Catalog, 10)
+
+func NewCore(c Config) *Core {
+	core := Core{
+		Server: http.Server{
+			Addr: c.Address,
+		},
+		KVRepo: c.KVRepo,
+		logger: c.Logger,
+		mu:     &sync.Mutex{},
+		Sqlite: c.Sqlite,
+	}
+	routes := initRoutes(&core)
+	core.Server.Handler = routes
+	s := core.getSettings()
+	// s, _ := loadSettings("settings.json")
+	h, err := loadHistory("history.json")
+	if err != nil {
+		fmt.Println("failed to load history")
+	}
+	core.Settings = s
+	core.History = h
+	return &core
+}
+
+func (c *Core) getCatalog(path string) *Catalog {
+	//проверка на существующий каталог
+	if v, ok := aggregatedCatalogs[path]; ok == true {
+		return v
+	}
+	var catalogRaw XMLCatalog
+	var t []*Terrorist
+	c.ReadXMLFromDir(path, &catalogRaw)
+	c.AggregateStructs(&catalogRaw, t)
+	catalog := catalogRaw.ConvertCatalog(t)
+	c.StoreAllKeys([]byte(path), &catalog)
+	aggregatedCatalogs[path] = &catalog
+	return &catalog
+}
+
+func (c *Core) StartServer() error {
+	return c.ListenAndServe()
+}
+
+func (c *Core) Shutdown(ctx context.Context) {
+	// c.storeSettings()
+	c.storeHistory()
 	c.KVRepo.Close()
 	c.Sqlite.Close()
+	c.Server.Shutdown(ctx)
 }
 func (c *Core) ReadXMLFromDir(path string, cat *XMLCatalog) error {
 	xmlFile, err := os.Open(path)
@@ -53,7 +99,7 @@ func (c *Core) ReadXMLFromDir(path string, cat *XMLCatalog) error {
 
 func (c *Core) AggregateStructs(cat *XMLCatalog, t []*Terrorist) []*Terrorist {
 	wg := &sync.WaitGroup{}
-	now := time.Now()
+
 	mu := &sync.Mutex{}
 	for _, ter := range cat.Terrorists {
 		wg.Add(1)
@@ -74,35 +120,46 @@ func (c *Core) AggregateStructs(cat *XMLCatalog, t []*Terrorist) []*Terrorist {
 		}(ter, wg)
 	}
 	wg.Wait()
-	fmt.Println(time.Since(now))
+
 	return t
 }
 
-type Result struct {
-	repository.SqlitePerson
-	Res []bool
-}
 
-func (c *Core) Search(tableName string) []*Result {
-	rows, err := c.Sqlite.Db.Query(fmt.Sprintf("select * from %s", tableName))
+func (c *Core) Search(bucketName, tableName string, cols []string) [][]Row[any] {
+	rows, err := c.Sqlite.Db.Query(fmt.Sprintf("SELECT %s FROM %s", strings.Join(cols, ", "), tableName))
 	if err != nil {
 		panic(err)
 	}
 	defer rows.Close()
 	pool := pool.NewPool(10, 3, 10)
 	wg := &sync.WaitGroup{}
-	var res []*Result
+	var res [][]Row[any]
 	mu := sync.Mutex{}
 	for rows.Next() {
 		wg.Add(1)
-		p := repository.SqlitePerson{}
-		err := rows.Scan(&p.Id, &p.Name, &p.Passport, &p.Inn, &p.Address)
-		if err != nil {
-			log.Println(err)
+		var maps []map[string]any
+
+		columns := make([]any, len(cols))
+		columnPointers := make([]any, len(cols))
+		for i, _ := range columns {
+			columnPointers[i] = &columns[i]
 		}
+
+		if err := rows.Scan(columnPointers...); err != nil {
+			continue
+		}
+
+		// Create our map, and retrieve the value for each column from the pointers slice,
+		// storing it in the map with the name of the column as the key.
+		m := make(map[string]any)
+		for i, colName := range cols {
+			val := columnPointers[i].(*any)
+			m[colName] = *val
+		}
+		maps = append(maps, m)
 		pool.Schedule(func() {
-			r := c.process(&p)
-			if r == nil {
+			r, isTrue := c.process(bucketName, m, cols)
+			if isTrue != true {
 				wg.Done()
 				return
 			} else {
@@ -116,68 +173,56 @@ func (c *Core) Search(tableName string) []*Result {
 	wg.Wait()
 	return res
 }
-func (c *Core) process(r *repository.SqlitePerson) *Result {
-	var h []bool
-	one, _ := c.KVRepo.GetValue([]byte(r.Name))
-	if one == "true" {
-		h = append(h, true)
-	} else {
-		h = append(h, false)
-	}
-	two, _ := c.KVRepo.GetValue([]byte(r.Passport))
-	if two == "true" {
-		h = append(h, true)
-	} else {
-		h = append(h, false)
-	}
-	three, _ := c.KVRepo.GetValue([]byte(r.Inn))
-	if three == "true" {
-		h = append(h, true)
-	} else {
-		h = append(h, false)
-	}
-	four, _ := c.KVRepo.GetValue([]byte(r.Address))
-	if four == "true" {
-		h = append(h, true)
-	} else {
-		h = append(h, false)
-	}
+func (c *Core) process(bucketName string, m map[string]any, cols []string) ([]Row[any],bool) {
+	numCols := len(cols)
+	numAfter := numCols
 
-	if isTrue(h) {
-		return &Result{
-			Res:          h,
-			SqlitePerson: *r,
-		}
-	} else {
-		return nil
+	row := make([]Row[any], numCols)
+	colIndexes := make(map[string]int, numCols)
+	//находим индекс колонки в массиве
+	for i, v := range cols {
+		colIndexes[v] = i
 	}
-}
-func isTrue(s []bool) bool {
-	for _, h := range s {
-		if h == true {
-			return true
+	for k, v := range m {
+		v := fmt.Sprintf("%v", v)
+		var r Row[any]
+		one, _ := c.KVRepo.GetValue([]byte(bucketName), []byte(v))
+		if one == "true" {
+			r.Selected = true
+			numAfter--
+		} else {
+			r.Selected = false
+			
 		}
+		r.Field = v
+		colIndex := colIndexes[k]
+		row[colIndex] = r
 	}
-	return false
+	if numCols == numAfter {
+		return nil, false
+	}
+	return row, true
+
 }
-func (c *Core) GetValue(key []byte) (string, error) {
-	return c.KVRepo.GetValue(key)
+
+func (c *Core) GetValue(bucketName, key []byte) (string, error) {
+	return c.KVRepo.GetValue(bucketName, key)
 }
-func (c *Core) StoreAllKeys(catalog *Catalog) {
+func (c *Core) StoreAllKeys(bucketName []byte, catalog *Catalog) {
 	wg := &sync.WaitGroup{}
 	for _, ter := range catalog.Terrorists {
 		wg.Add(1)
 		go func(ter *Terrorist, wg *sync.WaitGroup) {
 			for _, n := range ter.Names {
-				c.KVRepo.AddValue([]byte(n), []byte("true"))
+				c.KVRepo.AddValue(bucketName, []byte(n), []byte("true"))
 			}
 			for _, a := range ter.Address {
-				c.KVRepo.AddValue([]byte(a), []byte("true"))
+				c.KVRepo.AddValue(bucketName, []byte(a), []byte("true"))
 			}
 			for _, p := range ter.Passport.SerialAndNum {
-				c.KVRepo.AddValue([]byte(p), []byte("true"))
+				c.KVRepo.AddValue(bucketName, []byte(p), []byte("true"))
 			}
-			c.KVRepo.AddValue([]byte(ter.INN), []byte("true"))
+			c.KVRepo.AddValue(bucketName, []byte(ter.INN), []byte("true"))
 			wg.Done()
 		}(ter, wg)
 	}

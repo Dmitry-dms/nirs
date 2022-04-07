@@ -27,9 +27,9 @@ func NewBoltDB(fileName string) *BoltDB {
 func (b *BoltDB) Close() error {
 	return b.Database.Close()
 }
-func (b *BoltDB) AddValue(key, value []byte) error {
+func (b *BoltDB) AddValue(bucketName, key, value []byte) error {
 	b.Database.Batch(func(tx *bolt.Tx) error {
-		b, err := tx.CreateBucketIfNotExists([]byte(b.Names))
+		b, err := tx.CreateBucketIfNotExists(bucketName)
 		if err != nil {
 			return err
 		}
@@ -37,10 +37,10 @@ func (b *BoltDB) AddValue(key, value []byte) error {
 	})
 	return nil
 }
-func (b *BoltDB) GetValue(key []byte) (string, error) {
+func (b *BoltDB) GetValue(bucketName, key []byte) (string, error) {
 	var v []byte
 	err := b.Database.View(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte(b.Names))
+		b := tx.Bucket(bucketName)
 		v = b.Get(key)
 		return nil
 	})
