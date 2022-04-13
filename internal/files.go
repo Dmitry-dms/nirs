@@ -2,24 +2,22 @@ package internal
 
 import (
 	"encoding/json"
-	"io"
 	"path/filepath"
 	"strings"
 
-	"log"
 	"os"
+
+	"github.com/Dmitry-dms/nirs/internal/repository"
 )
 
 func loadSettings(path string) (Options, error) {
 	var s Options
 	file, err := os.ReadFile(path)
 	if err != nil {
-		log.Printf("there is no such file: %v", err)
 		return Options{}, err
 	}
 	err = json.Unmarshal(file, &s)
 	if err != nil {
-		log.Printf("unmarshaling failed: %v", err)
 		return Options{}, err
 	}
 	return s, nil
@@ -28,56 +26,24 @@ func loadHistory(path string) (History, error) {
 	var h History
 	file, err := os.ReadFile(path)
 	if err != nil {
-		log.Printf("there is no such file: %v", err)
 		return nil, err
 	}
 	err = json.Unmarshal(file, &h)
 	if err != nil {
-		log.Printf("unmarshaling failed: %v", err)
 		return nil, err
 	}
 	return h, nil
 }
 
-func (c *Core) storeSettings() error {
-	temp, err := os.CreateTemp("/", "temp.file")
+
+func (c *Core) storeHistory() error {	
+	data, err := os.Create("history.json")
 	if err != nil {
-		log.Printf("failed to create temp file: %v", err)
 		return err
 	}
-	var data *os.File
 	defer data.Close()
-	data, err = os.OpenFile("settings.json", os.O_APPEND, 0666)
-	if err != nil {
-		data, err = os.Create("settings.json")
-		log.Printf("error while write: %v", err)
-	}
-	io.Copy(temp, data)
-	json, err := json.Marshal(c.Settings)
-	if err != nil {
-		log.Printf("marshaling failed: %v", err)
-		return err
-	}
-	_, err = data.Write(json)
-	return err
-}
-func (c *Core) storeHistory() error {
-	temp, err := os.CreateTemp("/", "htemp.file")
-	if err != nil {
-		log.Printf("failed to create temp file: %v", err)
-		return err
-	}
-	var data *os.File
-	defer data.Close()
-	data, err = os.OpenFile("history.json", os.O_APPEND, 0666)
-	if err != nil {
-		data, err = os.Create("history.json")
-		log.Printf("error while write: %v", err)
-	}
-	io.Copy(temp, data)
 	json, err := json.Marshal(c.History)
 	if err != nil {
-		log.Printf("marshaling failed: %v", err)
 		return err
 	}
 	_, err = data.Write(json)
@@ -91,13 +57,14 @@ func (c *Core) getSettings() Options {
 	xmls := make([]XMLOption, len(xml))
 	for i, v := range sql {
 		name := []rune(v)[:len([]rune(v))-3]
-		tables, err := c.Sqlite.GetAllTables()
+		sqLite := repository.NewSqlite(v)
+		tables, err := sqLite.GetAllTables()
 		if err != nil {
 			c.logger.Println(err)
 		}
 		tab := make([]Table, len(tables))
 		for i, table := range tables {
-			cols, _ := c.Sqlite.GetColumns(table)
+			cols, _ := sqLite.GetColumns(table)
 			t := Table{
 				Name:    table,
 				Columns: cols,
@@ -111,6 +78,7 @@ func (c *Core) getSettings() Options {
 			Tables: tab,
 		}
 		sqls[i] = sqlOpt
+		sqLite.Close()
 	}
 	for i, v := range xml {
 		name := []rune(v)[:len([]rune(v))-4]

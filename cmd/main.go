@@ -1,59 +1,58 @@
 package main
 
 import (
-	// "context"
 	"context"
+
+
+	"os/exec"
+	"os/signal"
+	"runtime"
+	"syscall"
 
 	"log"
 	"os"
-
 
 	internal "github.com/Dmitry-dms/nirs/internal"
 	"github.com/Dmitry-dms/nirs/internal/repository"
 )
 
+
+
 func main() {
-	// now := time.Now()
-	// var catalogRaw internal.XMLCatalog
-	// var t []*internal.Terrorist
 
 	logger := log.New(os.Stdout, "SYSTEM: ", 1)
 	KVRepo := repository.NewBoltDB("perechen.db")
-	Sqlite := repository.NewSqlite("people.db")
 	config := internal.Config{
 		Address: ":8080",
 		KVRepo:  KVRepo,
-		Sqlite:  Sqlite,
 		Logger:  logger,
 	}
 	core := internal.NewCore(config)
 
-	// err := core.ReadXMLFromDir("ter.xml", &catalogRaw)
-	// if err != nil {
-	// 	log.Println(err)
-	// }
+	closeCh := make(chan os.Signal, 1)
+	signal.Notify(closeCh, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 
-	// t = core.AggregateStructs(&catalogRaw, t)
+	go core.StartServer()
+	go open("http://localhost:8080/")
+	logger.Printf("Сайт доступен по адресу http://localhost%s/ \n", config.Address)
+	logger.Println("Не закрывайте данное окно. Закрыть после окончания работы.")
+	<-closeCh
+	core.Shutdown(context.Background())
+}
 
-	// catalog := catalogRaw.ConvertCatalog(t)
-	// logger.Printf("Парсинг занял %s, количество записей - %d", time.Since(now), len(catalog.Terrorists))
-	// closeCh := make(chan os.Signal, 1)
-	// signal.Notify(closeCh, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
-	// <-closeCh
+func open(url string) error {
+	var cmd string
+	var args []string
 
-	// core.StoreAllKeys([]byte("names"), &catalog)
-	//logger.Println("server starting")
-	core.StartServer()
-	defer core.Shutdown(context.Background())
-	// cols := []string{"id","fio","passport","inn_ogrn","address"}
-	// s := core.Search("names","MOCKDATA",cols)
-
-	// // //fmt.Printf("Dlina - %d \n", len(s))
-	// for _, j := range s {
-	// 	// fmt.Printf("[%s;%s;%s;%s]\n", j.Name, j.Passport, j.Inn, j.Address)
-	// 	fmt.Printf("%v \n", j)
-	// }
-	// // //core.Shutdown(context.Background())
-	// fmt.Printf("Кол-во совпадений - %d \n", len(s))
-	// fmt.Printf("Время выполнения - %s \n", time.Since(now))
+	switch runtime.GOOS {
+	case "windows":
+		cmd = "cmd"
+		args = []string{"/c", "start"}
+	case "darwin":
+		cmd = "open"
+	default: // "linux", "freebsd", "openbsd", "netbsd"
+		cmd = "xdg-open"
+	}
+	args = append(args, url)
+	return exec.Command(cmd, args...).Start()
 }

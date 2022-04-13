@@ -21,6 +21,7 @@ type SearchRequest struct {
 	PPath   string   `json:"pPath"`
 	SQLPAth string   `json:"sqlPath"`
 	Table   string   `json:"table"`
+	Uid string `json:"uid"`
 	Columns []string `json:"columns"`
 }
 

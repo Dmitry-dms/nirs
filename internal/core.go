@@ -2,9 +2,10 @@ package internal
 
 import (
 	"context"
+	"fmt"
+
 
 	"encoding/xml"
-	"fmt"
 
 	"log"
 	"net/http"
@@ -21,7 +22,6 @@ import (
 type Core struct {
 	http.Server
 	KVRepo   repository.KVRepository
-	Sqlite   *repository.SqliteRepository
 	Settings Options
 	History  History
 	logger   *log.Logger
@@ -45,15 +45,14 @@ func NewCore(c Config) *Core {
 		KVRepo: c.KVRepo,
 		logger: c.Logger,
 		mu:     &sync.Mutex{},
-		Sqlite: c.Sqlite,
 	}
 	routes := initRoutes(&core)
 	core.Server.Handler = routes
 	s := core.getSettings()
-	// s, _ := loadSettings("settings.json")
+
 	h, err := loadHistory("history.json")
 	if err != nil {
-		fmt.Println("failed to load history")
+		core.logger.Println("Файла history.json не найдено. Он будет создан после проведения первой проверки.")
 	}
 	core.Settings = s
 	core.History = h
@@ -67,10 +66,16 @@ func (c *Core) getCatalog(path string) *Catalog {
 	}
 	var catalogRaw XMLCatalog
 	var t []*Terrorist
+
 	c.ReadXMLFromDir(path, &catalogRaw)
-	c.AggregateStructs(&catalogRaw, t)
+	t = c.AggregateStructs(&catalogRaw, t)
 	catalog := catalogRaw.ConvertCatalog(t)
-	c.StoreAllKeys([]byte(path), &catalog)
+	
+
+	exist := c.KVRepo.BucketExist(path)
+	if !exist {
+		c.StoreAllKeys([]byte(path), &catalog)
+	}
 	aggregatedCatalogs[path] = &catalog
 	return &catalog
 }
@@ -80,10 +85,8 @@ func (c *Core) StartServer() error {
 }
 
 func (c *Core) Shutdown(ctx context.Context) {
-	// c.storeSettings()
 	c.storeHistory()
 	c.KVRepo.Close()
-	c.Sqlite.Close()
 	c.Server.Shutdown(ctx)
 }
 func (c *Core) ReadXMLFromDir(path string, cat *XMLCatalog) error {
@@ -125,8 +128,8 @@ func (c *Core) AggregateStructs(cat *XMLCatalog, t []*Terrorist) []*Terrorist {
 }
 
 
-func (c *Core) Search(bucketName, tableName string, cols []string) [][]Row[any] {
-	rows, err := c.Sqlite.Db.Query(fmt.Sprintf("SELECT %s FROM %s", strings.Join(cols, ", "), tableName))
+func (c *Core) Search(repo repository.SqliteRepository,bucketName, tableName string, cols []string) [][]Row[any] {
+	rows, err := repo.Query(fmt.Sprintf("SELECT %s FROM %s", strings.Join(cols, ", "), tableName))
 	if err != nil {
 		panic(err)
 	}
@@ -149,8 +152,6 @@ func (c *Core) Search(bucketName, tableName string, cols []string) [][]Row[any] 
 			continue
 		}
 
-		// Create our map, and retrieve the value for each column from the pointers slice,
-		// storing it in the map with the name of the column as the key.
 		m := make(map[string]any)
 		for i, colName := range cols {
 			val := columnPointers[i].(*any)
@@ -171,6 +172,7 @@ func (c *Core) Search(bucketName, tableName string, cols []string) [][]Row[any] 
 		})
 	}
 	wg.Wait()
+
 	return res
 }
 func (c *Core) process(bucketName string, m map[string]any, cols []string) ([]Row[any],bool) {
@@ -186,7 +188,11 @@ func (c *Core) process(bucketName string, m map[string]any, cols []string) ([]Ro
 	for k, v := range m {
 		v := fmt.Sprintf("%v", v)
 		var r Row[any]
-		one, _ := c.KVRepo.GetValue([]byte(bucketName), []byte(v))
+		one, err := c.KVRepo.GetValue([]byte(bucketName), []byte(v))
+		if err != nil {
+			c.logger.Println(err)
+			return nil, false
+		}
 		if one == "true" {
 			r.Selected = true
 			numAfter--

@@ -1,6 +1,7 @@
 package repository
 
 import (
+	// "fmt"
 	"log"
 	"time"
 
@@ -27,20 +28,33 @@ func NewBoltDB(fileName string) *BoltDB {
 func (b *BoltDB) Close() error {
 	return b.Database.Close()
 }
+func (b *BoltDB) BucketExist(bucketName string) bool {
+	var exist bool
+	b.Database.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(bucketName))
+		if b != nil {
+			exist = true
+		} 
+		return nil
+	})
+	return exist
+}
 func (b *BoltDB) AddValue(bucketName, key, value []byte) error {
-	b.Database.Batch(func(tx *bolt.Tx) error {
+	return b.Database.Batch(func(tx *bolt.Tx) error {
 		b, err := tx.CreateBucketIfNotExists(bucketName)
 		if err != nil {
 			return err
 		}
 		return b.Put(key, value)
 	})
-	return nil
 }
 func (b *BoltDB) GetValue(bucketName, key []byte) (string, error) {
 	var v []byte
 	err := b.Database.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket(bucketName)
+		if b == nil {
+			return nil
+		}
 		v = b.Get(key)
 		return nil
 	})

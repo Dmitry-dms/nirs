@@ -12,15 +12,19 @@ type SqliteRepository struct {
 	Db *sql.DB
 }
 
-func NewSqlite(name string) *SqliteRepository {
+func NewSqlite(name string) SqliteRepository {
 	db, err := sql.Open("sqlite3", name)
 	if err != nil {
-		log.Fatalf("Failed to open connection with sqlite: %v", err)
+		log.Fatalf("Невозможно открыть базу данных %s: %v", name, err)
 	}
-	return &SqliteRepository{Db: db}
+	return SqliteRepository{Db: db}
 }
 func (r *SqliteRepository) Close() error {
 	return r.Db.Close()
+}
+
+func (r *SqliteRepository) Query(query string, args ...any) (*sql.Rows, error) {
+	return r.Db.Query(query, args...)
 }
 
 func (r *SqliteRepository) GetAllTables() ([]string, error) {
