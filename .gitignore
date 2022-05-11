@@ -1,5 +1,5 @@
 pass.txt
-ter.xml
+
 perechen.db
 perechen.db.lock
 people.db
@@ -10,3 +10,4 @@ main.exe
 /test2
 /test3
 .vscode
+history.json

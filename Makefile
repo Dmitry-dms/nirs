@@ -1,10 +1,14 @@
 .SILENT:
 
 
-run:
-	go run cmd/main.go
+BIN := main.exe
 
 build:
-	go build -o . cmd/main.go
-t:
-	go run test/main.go
+	go build -o ${BIN} cmd/main.go
+
+test:
+	go test ./...
+
+clean:
+	go clean
+	rm -f ${BIN}
