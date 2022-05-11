@@ -13,7 +13,7 @@ type SqliteRepository struct {
 }
 
 func NewSqlite(name string) SqliteRepository {
-	db, err := sql.Open("sqlite3", name)
+	db, err := sql.Open("sqlite3", "people.db")
 	if err != nil {
 		log.Fatalf("Невозможно открыть базу данных %s: %v", name, err)
 	}

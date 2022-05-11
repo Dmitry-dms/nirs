@@ -10,7 +10,6 @@ type History []HistoryElement
 
 type HistoryElement struct {
 	Date    string       `json:"date"`
-	SQLName string       `json:"sqlName"`
 	PName   string       `json:"pName"`
 	ID      string       `json:"id"`
 	Columns []string     `json:"columns"`
@@ -18,11 +17,17 @@ type HistoryElement struct {
 }
 
 type SearchRequest struct {
-	PPath   string   `json:"pPath"`
-	SQLPAth string   `json:"sqlPath"`
-	Table   string   `json:"table"`
 	Uid string `json:"uid"`
-	Columns []string `json:"columns"`
+}
+
+type SearchOneRequest []SearchOneElement
+
+type SearchOneElement struct {
+	ID    int64  `json:"id"`
+	Field string `json:"field"`
+}
+type SearchOneResponse struct {
+	Id []int `json:"ids"`
 }
 
 type Row[T any] struct {
@@ -30,25 +35,12 @@ type Row[T any] struct {
 	Selected bool `json:"selected"`
 }
 
-type Options struct {
-	XMLOptions []XMLOption `json:"xmlOptions"`
-	SQLOptions []SQLOption `json:"sqlOptions"`
-}
+type Columns []Column
 
-type SQLOption struct {
-	Name   string  `json:"name"`
-	Path   string  `json:"path"`
-	Tables []Table `json:"tables"`
-}
-
-type Table struct {
-	Name    string   `json:"name"`
-	Columns []string `json:"columns"`
-}
-
-type XMLOption struct {
-	Name string `json:"name"`
-	Path string `json:"path"`
+type Column struct {
+	Name       string `json:"name"`
+	NameColumn string `json:"name_column"`
+	Index      int64  `json:"index"`
 }
 
 type XMLCatalog struct {
@@ -99,14 +91,14 @@ func (c XMLCatalog) ConvertCatalog(terr []*Terrorist) Catalog {
 		Terrorists: terr,
 	}
 }
-func trimSpace(s []string) []string {
-	var n []string
-	for _, j := range s {
-		m := strings.TrimSpace(j)
-		n = append(n, m)
-	}
-	return n
-}
+// func trimSpace(s []string) []string {
+// 	var n []string
+// 	for _, j := range s {
+// 		m := strings.TrimSpace(j)
+// 		n = append(n, m)
+// 	}
+// 	return n
+// }
 func convertInn(s string) string {
 	inn := removeSpaces(s)
 	if len(inn) == 0 {
@@ -133,21 +125,6 @@ func (t *Terr) ConvertTerr(l *log.Logger) *Terrorist {
 	}
 }
 
-// func splitNames(s string) []string {
-// 	var names []string
-// 	secondName := strings.Split(s, "(")
-// 	if len(secondName) == 1 {
-// 		names = append(names, s)
-// 	} else {
-// 		firstName := s[:(len(s) - len(secondName[1]) - 1)]
-// 		n := strings.ReplaceAll(secondName[1], ")", "")
-// 		newName := strings.Split(n, ";")
-// 		names = append(names, firstName)
-// 		newName = trimSpace(newName)
-// 		names = append(names, newName...)
-// 	}
-// 	return names
-// }
 func splitNames(s string) []string {
 	var result []string
 	pattern := "\\(+.*"
@@ -202,12 +179,8 @@ func splitAddress(s string) []string {
 	var a []string
 	addresses := strings.Split(s, ";")
 	for _, j := range addresses {
-		//fmt.Println(j)
 		gg := strings.TrimSuffix(j, ",")
-		// if j[len(j)-1] == byte(','){
-		// 	j = j[:len(j)-1]
-		// }
-		a = append(a, gg)
+		a = append(a, removeSpaces(gg))
 	}
 	return a
 }
@@ -224,7 +197,6 @@ func splitPassport(s string, l *log.Logger) Passport {
 		singlePass = append(singlePass, raw...)
 		for _, p := range singlePass {
 			if len(p) < 9 { // Если разделение строк пошло не по шаблону, прекращаем разделение
-				//l.Println(p)
 				l.Printf("Пропуск парсинга паспорта, неправильный формат: [%#v] [%#v]", raw[0], raw[1])
 				return Passport{
 					RawData:      raw,
@@ -248,7 +220,7 @@ func splitPassport(s string, l *log.Logger) Passport {
 		}
 	}
 }
-func TrimSuffixAndPrefix(s string) string {
+func trimCDATASuffixAndPrefix(s string) string {
 	var l string
 	if len(s) <= 13 {
 		l = "NULL"

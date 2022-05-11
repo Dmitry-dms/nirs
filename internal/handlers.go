@@ -13,9 +13,33 @@ func initRoutes(c *Core) *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.Handle("/", http.FileServer(http.Dir("dist")))
 	mux.HandleFunc("/search", c.searchHandler)
+	mux.HandleFunc("/search-one", c.searchOneHandler)
 	mux.HandleFunc("/history", c.getHistory)
 	mux.HandleFunc("/opt", c.getOptions)
 	return mux
+}
+func (c *Core) searchOneHandler(rw http.ResponseWriter, r *http.Request) {
+	var sor SearchOneRequest
+	
+	decoder := json.NewDecoder(r.Body)
+	err := decoder.Decode(&sor)
+	if err != nil {
+		http.Error(rw, err.Error(), http.StatusBadRequest)
+	}
+	resId := make([]int, 0)
+	for _, v := range sor {
+		if c.SearchOne(v.Field) {
+			resId = append(resId, int(v.ID))
+		}
+	}
+	response := SearchOneResponse{
+		Id: resId,
+	}
+	data, err := json.Marshal(response)
+	if err != nil {
+		http.Error(rw, err.Error(), http.StatusInternalServerError)
+	}
+	rw.Write(data)
 }
 func (c *Core) searchHandler(rw http.ResponseWriter, r *http.Request) {
 	var sr SearchRequest
@@ -25,60 +49,29 @@ func (c *Core) searchHandler(rw http.ResponseWriter, r *http.Request) {
 		http.Error(rw, err.Error(), http.StatusBadRequest)
 	}
 
-	sqlName := ""
-	pName := ""
-	//поиск названия sql базы и название перечня
-	for _, v := range c.Settings.SQLOptions {
-		if v.Path == sr.SQLPAth {
-			sqlName = v.Name
-		}
-	}
-	for _, v := range c.Settings.XMLOptions {
-		if v.Path == sr.PPath {
-			pName = v.Name
-		}
-	}
+	c.GetCatalog(c.PerechenName)
 
-	c.getCatalog(sr.PPath)
-
-	repo := repository.NewSqlite(sr.SQLPAth)
-	res := c.Search(repo, sr.PPath, sr.Table, sr.Columns)
+	repo := repository.NewSqlite(c.SQLname)
+	res := c.Search(repo, "persons")
 	repo.Close()
+
 
 	history := HistoryElement{
 		Date:    time.Now().Format("2006.01.02 15:04"),
-		SQLName: sqlName,
-		PName:   pName,
+		PName:   c.PerechenName,
 		ID:      sr.Uid,
-		Columns: sr.Columns,
+		Columns: c.Columns,
 		Rows:    res,
 	}
 	c.History = append(c.History, history)
+
 	data, err := json.Marshal(history)
 	if err != nil {
 		http.Error(rw, err.Error(), http.StatusInternalServerError)
 	}
 	rw.Write(data)
 }
-// func (c *Core) showHandler(rw http.ResponseWriter, r *http.Request) {
 
-// 	h, err := os.ReadFile("settings.json")
-// 	if err != nil {
-// 		return
-// 	}
-// 	s := string(h)
-// 	fmt.Fprint(rw, s)
-// }
-// func (c *Core) write(rw http.ResponseWriter, r *http.Request) {
-// 	var data *os.File
-// 	var err error
-// 	defer data.Close()
-// 	data, err = os.OpenFile("settings.json", os.O_APPEND, 0666)
-// 	if err != nil {
-// 		data, err = os.Create("settings.json")
-// 	}
-// 	fmt.Fprint(data, "show page")
-// }
 func (c *Core) getHistory(rw http.ResponseWriter, r *http.Request) {
 	var file *os.File
 	var err error
@@ -93,8 +86,9 @@ func (c *Core) getHistory(rw http.ResponseWriter, r *http.Request) {
 	}
 	rw.Write(data)
 }
+
 func (c *Core) getOptions(rw http.ResponseWriter, r *http.Request) {
-	data, err := json.Marshal(c.Settings)
+	data, err := json.Marshal(c.Columns)
 	if err != nil {
 		http.Error(rw, err.Error(), http.StatusInternalServerError)
 	}
